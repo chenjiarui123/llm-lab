@@ -19,10 +19,9 @@ llm-lab/
 ├── dataset/                # [ignored] jsonl 数据
 ├── experiments/            # 每次实验的配置、指标、结论
 │   └── 2026-11-07-dense64m/
-├── modern-gpt/             # 现代组件版 GPT（RMSNorm/RoPE/GQA/SwiGLU/KV Cache）
-│   └── model.py
-├── nanogpt/                # nanoGPT 版（教学用，含训练循环）
-│   └── model.py
+├── nano-gpt/               # 教学模型目录
+│   ├── model1.py           # 基线：nanoGPT 版（含训练循环，字符级）
+│   └── model2.py           # 现代组件版（RMSNorm/RoPE/GQA/SwiGLU/KV Cache）
 ├── out/                    # [ignored] 训练权重 .pth
 ├── requirements/           # 依赖拆分
 │   ├── base.txt
@@ -31,46 +30,11 @@ llm-lab/
 └── third_party/minimind/   # [ignored] 用脚本 clone 的 MiniMind 源码
 ```
 
-### 逐个说明
 
-| 目录 | 作用 | 进 Git |
-|---|---|---|
-| `archives/` | 压缩包、临时大文件，随时可删 | 否 |
-| `configs/` | 每台机器一套 yaml，脚本不改、只换配置 | 是 |
-| `dataset/` | `pretrain_t2t_mini.jsonl`、`sft_t2t_mini.jsonl` | 否 |
-| `experiments/` | 一次实验一个目录：`config.yaml` + `metrics.csv` + `README.md` | 是 |
-| `modern-gpt/` | 自己写的现代 GPT，按模块替换学习 | 是 |
-| `nanogpt/` | Karpathy 教学版，单文件、能直接跑 | 是 |
-| `out/` | `pretrain_768.pth`、`full_sft_768.pth` | 否 |
-| `requirements/` | `base.txt` 通用依赖，`train.txt` 训练依赖 | 是 |
-| `scripts/` | setup / download / launch / train / eval | 是 |
-| `third_party/minimind/` | 第三方源码，clone 得到，只记录 commit | 否 |
 
-### 两个模型目录的区别
-
-| | `nanogpt/model.py` | `modern-gpt/model.py` |
-|---|---|---|
-| 来源 | `ng-video-lecture/gpt.py`（带中文注释） | 自己按模块重写 |
-| 形态 | 单文件，含训练循环，可独立运行 | 纯模块：只定义类，不含训练 |
-| 组件 | LayerNorm、learned 位置编码、GELU、MHA | RMSNorm、RoPE、SwiGLU、GQA、KV Cache |
-| 用途 | 当**骨架和基线** | 当**替换实验的答案册** |
-| 参数量 | 约 10.8M | 约 9.5M（全 modern） |
-
-推荐顺序：先读 `nanogpt/model.py` 看懂结构 → 再到 `modern-gpt/model.py` 一个模块一个模块替换。
-
-> 注意：`nanogpt/model.py` 第 22 行是 `open('input.txt')`，直接跑需要把
-> `E:\3_llm\ng-video-lecture\input.txt` 复制到当前目录，或者直接在 `ng-video-lecture/` 下运行。
-> `modern-gpt/model.py` 只有类定义，不读文件、不会被直接执行。
-
----
 
 ## 0. 一句话流程
 
-```text
-git clone llm-lab → setup 环境 → download 数据 → train_pretrain → train_sft → eval
-```
-
----
 
 ## 1. 环境
 
@@ -151,81 +115,11 @@ python scripts/launch.py sft      --config configs/local_8gb.yaml
 python scripts/launch.py pretrain --config configs/local_8gb.yaml --dry-run
 ```
 
-### 为什么要 `launch.py` 这一层
 
-MiniMind 的 trainer 内部写死了两处相对路径：
-
-```python
-init_model(...)                        # tokenizer_path 默认 '../model'
-lm_checkpoint(..., save_dir='../checkpoints')
-```
-
-所以必须在 `third_party/minimind/trainer/` 下运行，但数据和权重在 `llm-lab/` 下。
-`launch.py` 负责：读 yaml → 拼成 `--key value` → 切目录 → 启动子进程。
-
-### 产出
-
-```text
-out/pretrain_768.pth      # 预训练权重
-out/full_sft_768.pth      # SFT 后的对话权重
-```
 
 ---
 
-## 4. 评测
-
-```bash
-bash scripts/eval.sh full_sft
-bash scripts/eval.sh pretrain
-```
-
-等价于：
-
-```bash
-python third_party/minimind/eval_llm.py \
-  --load_from third_party/minimind/model \
-  --save_dir out --weight full_sft
-```
-
----
-
-## 5. 8GB 显存怎么撑住
-
-\[
-\text{显存} \approx \text{batch\_size} \times \text{max\_seq\_len} \times \text{常数}
-\]
-
-OOM 时按这个顺序降，**不要动模型结构**：
-
-```text
-batch_size:      8 → 4 → 2
-max_seq_len:   512 → 384 → 256 → 192
-num_workers:     8 → 4 → 2
-```
-
-`accumulation_steps` 反过来加倍，保持有效 batch 不变：
-
-\[
-\text{有效 batch} = \text{batch\_size} \times \text{accumulation\_steps}
-\]
-
-所以 `8×16 = 4×32 = 2×64`。
-
----
-
-## 6. 判断“训练是对的”
-
-Pretrain 初始 loss 约：
-
-\[
-\ln(6400) \approx 8.76
-\]
-
-只要 loss 从 8.x 往下走，说明数据、tokenizer、前向反向都通了。
-
----
-
-## 7. 实验记录
+## 4. 实验记录
 
 每次实验在 `experiments/` 下建目录：
 
@@ -240,7 +134,7 @@ experiments/2026-11-07-dense64m/
 
 ---
 
-## 8. 三台机器怎么同步
+## 5. 三台机器怎么同步
 
 ```text
 代码：  Mac ↔ GitHub ↔ Windows / AutoDL     （git）
@@ -249,13 +143,3 @@ experiments/2026-11-07-dense64m/
 环境：  每台机器各自重建                    （setup 脚本）
 ```
 
-GitHub 远端第一次推送：
-
-```powershell
-cd E:\3_llm\llm-lab
-git remote add origin https://github.com/<用户名>/llm-lab.git
-git push -u origin main
-```
-
-没有 GitHub CLI（`gh`）也能推送，`git` 自带凭据管理即可。
-装了 `gh` 之后可以先 `gh auth login` 再自动带凭据，属于可选项。
