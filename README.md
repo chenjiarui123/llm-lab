@@ -1,21 +1,62 @@
 # llm-lab
 
 从零学大模型的实验工作区。本地（Windows / 8GB 显存）与远端（AutoDL）共用同一份代码，
-只有配置不同；**代码走 Git，数据和权重走 ModelScope / Transmit，环境每台机器各自重建**。
+只有配置不同：**代码走 Git，数据和权重走 ModelScope / Transmit，环境每台机器各自重建**。
 
-```
+---
+
+## 目录（A → Z）
+
+```text
 llm-lab/
+├── .gitattributes          # 换行符策略：.sh/.py 强制 LF
+├── .gitignore              # dataset/ out/ third_party/ 全部排除
 ├── README.md
-├── .gitignore
-├── requirements/        # 依赖拆分
-├── scripts/             # 环境/下载/训练/评测 入口
-├── configs/             # 机器相关参数（唯一需要改的地方）
-├── modern-gpt/          # 自己实现的现代 GPT（对照学习用）
-├── experiments/         # 每次实验的配置、指标、结论
-├── dataset/             # [ignored] jsonl 数据
-├── out/                 # [ignored] 训练权重 .pth
-└── third_party/minimind # [ignored] 用脚本 clone 的 MiniMind 源码
+├── archives/               # [ignored] 压缩包、临时大文件
+├── configs/                # 机器相关参数（唯一需要改的地方）
+│   ├── autodl_24gb.yaml
+│   └── local_8gb.yaml
+├── dataset/                # [ignored] jsonl 数据
+├── experiments/            # 每次实验的配置、指标、结论
+│   └── 2026-11-07-dense64m/
+├── modern-gpt/             # 现代组件版 GPT（RMSNorm/RoPE/GQA/SwiGLU/KV Cache）
+│   └── model.py
+├── nanogpt/                # nanoGPT 版（教学用，含训练循环）
+│   └── model.py
+├── out/                    # [ignored] 训练权重 .pth
+├── requirements/           # 依赖拆分
+│   ├── base.txt
+│   └── train.txt
+├── scripts/                # 环境/下载/训练/评测 入口
+└── third_party/minimind/   # [ignored] 用脚本 clone 的 MiniMind 源码
 ```
+
+### 逐个说明
+
+| 目录 | 作用 | 进 Git |
+|---|---|---|
+| `archives/` | 压缩包、临时大文件，随时可删 | 否 |
+| `configs/` | 每台机器一套 yaml，脚本不改、只换配置 | 是 |
+| `dataset/` | `pretrain_t2t_mini.jsonl`、`sft_t2t_mini.jsonl` | 否 |
+| `experiments/` | 一次实验一个目录：`config.yaml` + `metrics.csv` + `README.md` | 是 |
+| `modern-gpt/` | 自己写的现代 GPT，按模块替换学习 | 是 |
+| `nanogpt/` | Karpathy 教学版，单文件、能直接跑 | 是 |
+| `out/` | `pretrain_768.pth`、`full_sft_768.pth` | 否 |
+| `requirements/` | `base.txt` 通用依赖，`train.txt` 训练依赖 | 是 |
+| `scripts/` | setup / download / launch / train / eval | 是 |
+| `third_party/minimind/` | 第三方源码，clone 得到，只记录 commit | 否 |
+
+### 两个模型目录的区别
+
+| | `nanogpt/model.py` | `modern-gpt/model.py` |
+|---|---|---|
+| 来源 | `ng-video-lecture/gpt.py`（带中文注释） | 自己按模块重写 |
+| 形态 | 单文件，含训练循环，可独立运行 | 纯模块：只定义类，不含训练 |
+| 组件 | LayerNorm、learned 位置编码、GELU、MHA | RMSNorm、RoPE、SwiGLU、GQA、KV Cache |
+| 用途 | 当**骨架和基线** | 当**替换实验的答案册** |
+| 参数量 | 约 10.8M | 约 9.5M（全 modern） |
+
+推荐顺序：先读 `nanogpt/model.py` 看懂结构 → 再到 `modern-gpt/model.py` 一个模块一个模块替换。
 
 ---
 
@@ -71,7 +112,7 @@ python scripts/download_data.py --mini
 
 下完会落在 `dataset/`。**不要下 `pretrain_t2t.jsonl` / `sft_t2t.jsonl`（10GB / 14GB 全量版）。**
 
-已有数据文件想跳过下载：
+只检查本地是否齐全：
 
 ```bash
 python scripts/download_data.py --check
@@ -100,11 +141,23 @@ python scripts/launch.py pretrain --config configs/local_8gb.yaml
 python scripts/launch.py sft      --config configs/local_8gb.yaml
 ```
 
-只想验证能跑通（不保存正式权重）：
+只看命令不执行：
 
 ```powershell
-python scripts/launch.py pretrain --config configs/local_8gb.yaml --extra --save_interval 999999
+python scripts/launch.py pretrain --config configs/local_8gb.yaml --dry-run
 ```
+
+### 为什么要 `launch.py` 这一层
+
+MiniMind 的 trainer 内部写死了两处相对路径：
+
+```python
+init_model(...)                        # tokenizer_path 默认 '../model'
+lm_checkpoint(..., save_dir='../checkpoints')
+```
+
+所以必须在 `third_party/minimind/trainer/` 下运行，但数据和权重在 `llm-lab/` 下。
+`launch.py` 负责：读 yaml → 拼成 `--key value` → 切目录 → 启动子进程。
 
 ### 产出
 
@@ -192,16 +245,13 @@ experiments/2026-11-07-dense64m/
 环境：  每台机器各自重建                    （setup 脚本）
 ```
 
-`.gitignore` 已经把 `dataset/` `out/` `third_party/` `.venv/` 全部排除。
+GitHub 远端第一次推送：
 
----
+```powershell
+cd E:\3_llm\llm-lab
+git remote add origin https://github.com/<用户名>/llm-lab.git
+git push -u origin main
+```
 
-## 9. 和 modern-gpt 的关系
-
-| 目录 | 角色 |
-|---|---|
-| `modern-gpt/` | 自己写的现代 GPT，用来“理解每个部件” |
-| `third_party/minimind/` | 成熟参考实现，用来“跑完整流程” |
-
-推荐用法：先在 `modern-gpt` 里改一个模块（RMSNorm / RoPE / GQA / SwiGLU），
-再回 MiniMind 看同部件在真实工程里怎么落地。
+没有 GitHub CLI（`gh`）也能推送，`git` 自带凭据管理即可。
+装了 `gh` 之后可以先 `gh auth login` 再自动带凭据，属于可选项。
