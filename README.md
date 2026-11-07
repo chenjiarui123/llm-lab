@@ -58,6 +58,10 @@ llm-lab/
 
 推荐顺序：先读 `nanogpt/model.py` 看懂结构 → 再到 `modern-gpt/model.py` 一个模块一个模块替换。
 
+> 注意：`nanogpt/model.py` 第 22 行是 `open('input.txt')`，直接跑需要把
+> `E:\3_llm\ng-video-lecture\input.txt` 复制到当前目录，或者直接在 `ng-video-lecture/` 下运行。
+> `modern-gpt/model.py` 只有类定义，不读文件、不会被直接执行。
+
 ---
 
 ## 0. 一句话流程
