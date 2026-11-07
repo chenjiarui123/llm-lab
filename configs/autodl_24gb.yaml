@@ -1,0 +1,41 @@
+# AutoDL：单卡 24GB（3090 / 4090）
+# 与 local_8gb.yaml 唯一的区别就是显存相关参数
+
+name: autodl_24gb
+device: cuda
+
+paths:
+  dataset_dir: dataset
+  save_dir: out
+  minimind_dir: third_party/minimind
+
+model:
+  hidden_size: 768
+  num_hidden_layers: 8
+  use_moe: 0
+
+pretrain:
+  data_file: pretrain_t2t_mini.jsonl
+  batch_size: 32
+  accumulation_steps: 4           # 有效 batch = 32 x 4 = 128，和本地一致
+  max_seq_len: 512
+  num_workers: 8
+  epochs: 1
+  learning_rate: 5.0e-4
+  dtype: bfloat16
+  log_interval: 50
+  save_interval: 500
+  from_weight: none
+
+sft:
+  data_file: sft_t2t_mini.jsonl
+  batch_size: 16
+  accumulation_steps: 2           # 有效 batch = 16 x 2 = 32
+  max_seq_len: 768
+  num_workers: 8
+  epochs: 1
+  learning_rate: 1.0e-5
+  dtype: bfloat16
+  log_interval: 50
+  save_interval: 500
+  from_weight: pretrain

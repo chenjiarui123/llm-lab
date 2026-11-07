@@ -1,0 +1,7 @@
+# 训练 / 数据 / 推理所需
+transformers>=4.45
+datasets>=2.19
+sentencepiece>=0.1.99
+modelscope>=1.15
+huggingface_hub>=0.24
+accelerate>=0.30

@@ -1,0 +1,48 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.python-version
+
+# ---------- 虚拟环境 ----------
+.venv/
+venv/
+env/
+.conda/
+
+# ---------- 数据 / 权重 / 日志（绝不进 Git）----------
+dataset/
+data/
+out/
+checkpoints/
+archives/
+*.pth
+*.pt
+*.bin
+*.safetensors
+*.jsonl
+*.parquet
+*.log
+
+# ---------- 第三方源码（用脚本 clone，只记录 commit）----------
+third_party/
+
+# ---------- 实验产物 ----------
+experiments/**/wandb/
+experiments/**/runs/
+experiments/**/swanlog/
+wandb/
+runs/
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 密钥 ----------
+.env
+.env.*
+!.env.example
+*.pem
