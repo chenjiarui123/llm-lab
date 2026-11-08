@@ -12,7 +12,6 @@ llm-lab/
 ├── .gitattributes          # 换行符策略：.sh/.py 强制 LF
 ├── .gitignore              # dataset/ out/ third_party/ 全部排除
 ├── README.md
-├── archives/               # [ignored] 压缩包、临时大文件
 ├── configs/                # 机器相关参数（唯一需要改的地方）
 │   ├── autodl_24gb.yaml
 │   └── local_8gb.yaml
@@ -22,6 +21,7 @@ llm-lab/
 ├── nano-gpt/               # 教学模型目录
 │   ├── model1.py           # 基线：nanoGPT 版（含训练循环，字符级）
 │   └── model2.py           # 现代组件版（RMSNorm/RoPE/GQA/SwiGLU/KV Cache）
+├── notes/                  # 学习笔记（按主题分目录）
 ├── out/                    # [ignored] 训练权重 .pth
 ├── requirements/           # 依赖拆分
 │   ├── base.txt
@@ -29,6 +29,8 @@ llm-lab/
 ├── scripts/                # 环境/下载/训练/评测 入口
 └── third_party/minimind/   # [ignored] 用脚本 clone 的 MiniMind 源码
 ```
+
+> 笔记在 [notes/](notes/README.md)：结构、参数账、训练要点，按主题分目录。
 
 
 

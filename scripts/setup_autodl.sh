@@ -70,7 +70,7 @@ COMMIT=$(git -C third_party/minimind rev-parse --short HEAD)
 echo "==> MiniMind commit: ${COMMIT}"
 
 # ---------- 5. 目录 ----------
-mkdir -p dataset out archives
+mkdir -p dataset out
 
 echo ""
 echo "完成。下一步："

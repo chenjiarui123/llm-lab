@@ -15,7 +15,6 @@ dataset/
 data/
 out/
 checkpoints/
-archives/
 *.pth
 *.pt
 *.bin

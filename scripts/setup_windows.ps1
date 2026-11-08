@@ -72,7 +72,7 @@ Pop-Location
 Write-Host "==> MiniMind commit: $commit" -ForegroundColor Green
 
 # ---------- 6. 目录 ----------
-foreach ($d in @("dataset", "out", "archives")) {
+foreach ($d in @("dataset", "out")) {
     New-Item -ItemType Directory -Force -Path (Join-Path $Root $d) | Out-Null
 }
 
