@@ -1,8 +1,8 @@
 # 数据流：从 `hello` 到 `hello world`
 
-以 MiniMind dense（hidden 768、8 层、8 头、kv 头 4、词表 6400）为例。
+![结构图](assets/minimind-structure.jpg)
 
-![结构图](../assets/minimind-structure.jpg)
+以 MiniMind dense（hidden 768、8 层、8 头、kv 头 4、词表 6400）为例。
 
 ## 1. 整体一次前向
 
@@ -16,8 +16,6 @@
   → SoftMax                变成概率
   → Tokenizer Decoder      取概率最大的 id → 文本 "world"
 ```
-
-设输入 5 个 token，进网络的张量是 `[5, 768]`（实际还有 batch 维，先忽略）。
 
 **残差流的宽度永远是 768。** 这是看懂所有形状的锚点：每个子层进去是 768，出来必须还是 768，才能加回主干（`h = x + sublayer(x)`）。
 
@@ -40,16 +38,16 @@ h [5, 768]
 x [5, 768]
  ├─ q_proj 768→768 ─→ Q [5, 8, 96]   q_norm(96) ─→ RoPE ─┐
  ├─ k_proj 768→384 ─→ K [5, 4, 96]   k_norm(96) ─→ RoPE ─┤
- └─ v_proj 768→384 ─→ V [5, 4, 96]                        │
-                                                          ↓
+ └─ v_proj 768→384 ─→ V [5, 4, 96]                       │
+                                                         ↓
         K,V 复制 2 份（4→8 组）← repeat_kv ────→ scores = Q·Kᵀ/√96  [5,8,5,5]
-                                                          ↓
+                                                         ↓
                                     mask 上三角置 -∞（只能看左边）
-                                                          ↓
+                                                         ↓
                                         softmax → 权重 × V → [5, 8, 96]
-                                                          ↓
+                                                         ↓
                                     拼回 [5, 768] ─→ o_proj 768→768
-                                                          ↓
+                                                         ↓
                                                   ⊕ 加回残差
 ```
 
@@ -77,7 +75,7 @@ x [5, 768]
 
 即 `down_proj( SiLU(gate_proj(x)) * up_proj(x) )`，这就是 SwiGLU。
 
-三个矩阵都是 2432 宽（$2432 \approx \frac{8}{3}\times768$，取 64 的倍数）。**FFN 参数是 attention 的 3.2 倍**（560万 vs 177万），这是 Transformer 的常态：一半以上的参数都在 FFN 里。
+三个矩阵都是 2432 宽。$2432=\lceil768\pi/64\rceil\times64=38\times64$ —— MiniMind 用的是 $\pi$ 倍再向上取整到 64 的倍数（`third_party/minimind/model/model_minimind.py:26`），不是 Llama 惯用的 $\frac{8}{3}\times768=2048$。**FFN 参数是 attention 的 3.2 倍**（560万 vs 177万），这是 Transformer 的常态：一半以上的参数都在 FFN 里。
 
 为什么两条分支再相乘？可以理解成 `gate` 通道算出一个 0~1 附近的「闸门」，去调节 `up` 通道里的信息该怎么放行。纯乘法结构的表达力比单条 `ReLU(Wx)` 强，同参数下效果更好。
 
