@@ -1,0 +1,44 @@
+# 正式预训练：全量 pretrain_t2t_mini.jsonl（1,634,703 条）
+# 由 configs/local_8gb.yaml 复制，只改三处：
+#   data_file     → 全量（不是 _smoke.jsonl）
+#   save_interval → 5000（500 太小，一轮 400 次写盘 ≈ 白扔 20 分钟）
+# 预计耗时：204,338 micro-step × ~0.08s ≈ 4.5 小时（epochs: 1）
+
+name: pretrain-full
+device: cuda
+
+paths:
+  dataset_dir: dataset            # 相对 llm-lab 根目录
+  save_dir: out                   # 相对 llm-lab 根目录
+  minimind_dir: third_party/minimind
+
+model:
+  hidden_size: 768                # dense 64M 的默认宽度
+  num_hidden_layers: 8
+  use_moe: 0                      # 0 = dense，1 = MoE
+
+pretrain:
+  data_file: pretrain_t2t_mini.jsonl
+  batch_size: 8
+  accumulation_steps: 16          # 有效 batch = 8 x 16 = 128
+  max_seq_len: 256
+  num_workers: 2
+  epochs: 1
+  learning_rate: 5.0e-4
+  dtype: bfloat16
+  log_interval: 50
+  save_interval: 5000
+  from_weight: none
+
+sft:
+  data_file: sft_t2t_mini.jsonl
+  batch_size: 4
+  accumulation_steps: 4           # 有效 batch = 4 x 4 = 16
+  max_seq_len: 512
+  num_workers: 2
+  epochs: 1
+  learning_rate: 1.0e-5
+  dtype: bfloat16
+  log_interval: 50
+  save_interval: 500
+  from_weight: pretrain
