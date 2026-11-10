@@ -44,7 +44,7 @@
 
 ```bat
 cd /d E:\3_llm\llm-lab
-run.bat                                  :: 脱离会话后台跑，日志进 train.log
+experiments\2026-11-10-pretrain-full\run.bat  :: 脱离会话后台跑，日志进 train.log
 python scripts\launch.py pretrain --config experiments\2026-11-10-pretrain-full\config.yaml
 ```
 
