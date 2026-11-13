@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -105,7 +106,42 @@ def _cast(v: str):
     return v
 
 
-def build_argv(stage: str, cfg: dict, extra: list[str]) -> tuple[Path, list[str]]:
+def _stage_from_weight(sec: dict, save_dir: Path, model: dict, minimind: Path, dry_run: bool = False) -> None:
+    """MiniMind 的 init_model 默认从 '../out'（相对 cwd=trainer）读初始权重，而 llm-lab 把
+    训练产出集中到 out/。这里在启动前把 from_weight 指定的权重硬链/复制到 MiniMind 期望的
+    third_party/minimind/out/，使 pretrain/sft/续训等各 stage 通用，无需手改 third_party。
+    """
+    from_weight = sec.get("from_weight")
+    if from_weight in (None, "", "none"):
+        return
+    hidden = model.get("hidden_size", 768)
+    suffix = "_moe" if bool(model.get("use_moe", 0)) else ""
+    src = save_dir / f"{from_weight}_{hidden}{suffix}.pth"
+    if not src.exists():
+        sys.exit(
+            f"[!] 找不到初始权重 {src}\n"
+            f"    from_weight={from_weight}：先跑对应阶段（如 pretrain）生成该权重"
+        )
+    dst_dir = minimind / "out"
+    dst = dst_dir / src.name
+    if dry_run:
+        print(f"[stage] 将把 {src} 链到 {dst}（MiniMind init_model 默认读 '../out'）")
+        return
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        if dst.stat().st_size == src.stat().st_size and dst.stat().st_mtime >= src.stat().st_mtime:
+            print(f"[stage] 初始权重已就位：{dst}")
+            return
+        dst.unlink()
+    try:
+        os.link(src, dst)
+        print(f"[stage] 已硬链接初始权重 -> {dst}")
+    except OSError:
+        shutil.copyfile(src, dst)
+        print(f"[stage] 已复制初始权重 -> {dst}")
+
+
+def build_argv(stage: str, cfg: dict, extra: list[str], dry_run: bool = False) -> tuple[Path, list[str]]:
     minimind = (ROOT / cfg["paths"]["minimind_dir"]).resolve()
     trainer_dir = minimind / "trainer"
     script = trainer_dir / STAGE_SCRIPT[stage]
@@ -146,6 +182,9 @@ def build_argv(stage: str, cfg: dict, extra: list[str]) -> tuple[Path, list[str]
         if key in sec and sec[key] is not None:
             argv += [f"--{key}", str(sec[key])]
 
+    # 修正 from_weight 权重路径：MiniMind 的 init_model 默认读 trainer/../out
+    _stage_from_weight(sec, save_dir, model, minimind, dry_run=dry_run)
+
     argv += extra
     return trainer_dir, argv
 
@@ -170,7 +209,7 @@ def main() -> None:
         sys.exit(f"[!] 配置文件不存在：{cfg_path}")
 
     cfg = load_yaml(cfg_path)
-    cwd, argv = build_argv(args.stage, cfg, args.extra)
+    cwd, argv = build_argv(args.stage, cfg, args.extra, dry_run=args.dry_run)
 
     printable = " ".join(argv)
     print(f"[cfg ] {cfg_path}")

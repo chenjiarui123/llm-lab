@@ -1,6 +1,6 @@
 # 数据流：从 `hello` 到 `hello world`
 
-![结构图](assets/minimind-structure.jpg)
+<img src="assets/minimind-structure.jpg" alt="结构图" width="720" style="max-width:100%;height:auto;">
 
 以 MiniMind dense（hidden 768、8 层、8 头、kv 头 4、词表 6400）为例。
 

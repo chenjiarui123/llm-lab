@@ -17,7 +17,6 @@ llm-lab/
 │   └── local_8gb.yaml
 ├── dataset/                # [ignored] jsonl 数据
 ├── experiments/            # 每次实验的配置、指标、结论
-│   └── 2026-11-07-dense64m/
 ├── nano-gpt/               # 教学模型目录
 │   ├── model1.py           # 基线：nanoGPT 版（含训练循环，字符级）
 │   └── model2.py           # 现代组件版（RMSNorm/RoPE/GQA/SwiGLU/KV Cache）
@@ -121,18 +120,31 @@ python scripts/launch.py pretrain --config configs/local_8gb.yaml --dry-run
 
 ---
 
-## 4. 实验记录
-
-每次实验在 `experiments/` 下建目录：
+## 4. Autodl使用方法
 
 ```text
-experiments/2026-11-07-dense64m/
-├── config.yaml    # 当次实际用的配置（拷贝一份，不要引用）
-├── metrics.csv    # step,loss,lr,备注
-└── README.md      # 假设 / 结果 / 结论 / 踩坑
-```
+# ① 进实例（普通 SSH，无需端口转发）
+ssh root@region-xx.autodl.com -p <端口>
 
-只提交这三个小文件，不提交权重和日志。
+# ② 加速 + 拿代码
+source /etc/network_turbo
+cd ~ && git clone https://github.com/chenjiarui123/llm-lab.git && cd llm-lab
+
+# ③ 建环境 + clone MiniMind（脚本里会检查 torch/CUDA）
+bash scripts/setup_autodl.sh
+source .venv/bin/activate          # 关键：后面用这个 python 才有依赖
+
+# ④ 下数据（ModelScope 直连，最快）
+python scripts/download_data.py --mini --source modelscope
+
+# ⑤ 传权重（在 Mac 上另开终端）
+#    scp -P <端口> out/pretrain_768.pth root@region-xx.autodl.com:~/llm-lab/out/
+
+# ⑥ 跑训练（AutoDL 用 24GB 的配置）
+bash scripts/train_pretrain.sh configs/autodl_24gb.yaml   # 或跳过，已有权重
+bash scripts/train_sft.sh      configs/autodl_24gb.yaml
+bash scripts/eval.sh full_sft
+```
 
 ---
 

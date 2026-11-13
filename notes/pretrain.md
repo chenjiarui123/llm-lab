@@ -1,6 +1,11 @@
 # 预训练：一次参数更新里到底发生了什么
 
-以 MiniMind dense 64M（hidden 768、8 层、词表 6400）、`batch_size=8`、`accumulation_steps=16`、`max_seq_len=256`、bf16 为例。
+```text
+for epoch → for step(1…iters): 前向 → loss/A → backward（梯度累加）
+    if step % A == 0 or step == iters 
+      unscale → clip_grad_norm(1.0) → optimizer.step → zero_grad
+    log / save
+```
 
 ## 1. 四个量，别混
 
@@ -13,8 +18,7 @@
 
 $$\text{iters}=\left\lceil\frac{N}{B}\right\rceil,\qquad \text{更新次数}=\left\lceil\frac{\text{iters}}{A}\right\rceil,\qquad \text{总更新}=\text{epochs}\times\left\lceil\frac{\text{iters}}{A}\right\rceil$$
 
-**step ≠ 参数更新次数。** 每 $A=16$ 个 step 才更新一次参数，所以 `step 500` 实际只更新了 31 次。
-
+一句话记住：**epoch = 总轮次，iters = 一轮多少个 step，step = 这一轮跑到第几个**。
 ## 2. 一次更新 = 六步，顺序不能换
 
 ```text
@@ -148,17 +152,3 @@ jsonl 一行 {"text": "..."}
 | 512 | 770~870 | 要 batch 2 |
 
 600 字的样本在 256 下只保留约 2/3，**被砍掉的是句尾**。
-
-## 8. 开跑前的排错表
-
-| 症状 | 大概率原因 |
-|---|---|
-| 首步 loss ≠ 8.7~8.9 | vocab_size 不一致 / labels 自己 shift 过 / 加载了已训权重 |
-| loss 完全不降 | 梯度被 clip 恒定截断（如忘了 `/A`）/ lr 太小 / 标签全 -100 |
-| `loss=nan` | fp16 溢出、lr 太大、在 bf16 下算交叉熵 |
-| loss 降得极慢且无报错 | fp16 梯度下溢（缺 GradScaler） |
-| OOM | `batch_size` 8→4→2，再降 `max_seq_len`，`accumulation_steps` 反比加倍 |
-
-## 一句话串起来
-
-**128 条样本算出一个平均梯度，按余弦曲线给定的步长把它从参数里减掉；loss 从「全词表瞎猜」的 8.76 出发，靠「位置 $t$ 猜 $t+1$」这条唯一规则，把每个位置猜中的概率从 $1/6400$ 一点点抬起来。**
