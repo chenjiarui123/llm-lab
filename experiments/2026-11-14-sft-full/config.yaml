@@ -1,0 +1,44 @@
+# 正式 SFT：全量 sft_t2t_mini.jsonl（905,718 条），AutoDL 单卡 RTX 5090 32GB
+# 由 configs/autodl_24gb.yaml 复制，训练时未改动（sft.batch_size 本来就是 16）。
+# 本次记录的就是这一份配置的实际取值；硬件是 5090 32GB，不是 8GB 本地机。
+#   sft: batch 16 x accum 2 = 有效 32，max_seq_len 768，1 epoch，lr 1e-5 余弦→1e-6
+#   from_weight: pretrain（读 out/pretrain_768.pth）
+
+name: sft-full
+device: cuda
+
+paths:
+  dataset_dir: dataset
+  save_dir: out
+  minimind_dir: third_party/minimind
+
+model:
+  hidden_size: 768
+  num_hidden_layers: 8
+  use_moe: 0
+
+pretrain:
+  data_file: pretrain_t2t_mini.jsonl
+  batch_size: 32
+  accumulation_steps: 4
+  max_seq_len: 512
+  num_workers: 8
+  epochs: 1
+  learning_rate: 5.0e-4
+  dtype: bfloat16
+  log_interval: 50
+  save_interval: 500
+  from_weight: none
+
+sft:
+  data_file: sft_t2t_mini.jsonl
+  batch_size: 16
+  accumulation_steps: 2           # 有效 batch = 16 x 2 = 32
+  max_seq_len: 768
+  num_workers: 8
+  epochs: 1
+  learning_rate: 1.0e-5
+  dtype: bfloat16
+  log_interval: 50
+  save_interval: 500
+  from_weight: pretrain
